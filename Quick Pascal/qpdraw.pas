@@ -42,7 +42,7 @@
   Whitespace and semicolons are ignored between commands.
 
   Usage:
-    uses PTCGraph, PTCDraw;
+    uses MSGraph, QPDraw;
 
     Draw('BM100,100 C14 S8 R50 D50 L50 U50');  { draw a yellow square }
     Draw('BM160,100 TA45 R50');                { draw rotated line }

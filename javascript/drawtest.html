@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DRAW Command Demo - JavaScript Port</title>
+    <script src="owdraw.js"></script>
+    <style>
+        /* ---- Reset & base ---- */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: #1a1a2e;
+            color: #e0e0e0;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 24px 16px;
+            gap: 20px;
+        }
+
+        h1 {
+            font-size: 1.3rem;
+            color: #ffff55;          /* QB color 14 - yellow */
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .subtitle {
+            font-size: 0.75rem;
+            color: #888;
+            text-align: center;
+        }
+        .subtitle a { color: #55ffff; text-decoration: none; }
+        .subtitle a:hover { text-decoration: underline; }
+
+        /* ---- Canvas wrapper ---- */
+        .canvas-wrapper {
+            border: 2px solid #333;
+            box-shadow: 0 0 24px rgba(85, 255, 255, 0.15);
+            line-height: 0;   /* remove inline-block gap below canvas */
+        }
+
+        canvas {
+            display: block;
+            image-rendering: pixelated;   /* keep sharp on HiDPI screens */
+        }
+
+        /* ---- Interactive console ---- */
+        .console {
+            width: 640px;
+            max-width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .console label {
+            font-size: 0.75rem;
+            color: #aaa;
+            letter-spacing: 1px;
+        }
+
+        .input-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .console input[type="text"] {
+            flex: 1;
+            background: #0d0d1a;
+            color: #55ff55;
+            border: 1px solid #333;
+            padding: 8px 12px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            outline: none;
+            caret-color: #55ff55;
+        }
+        .console input[type="text"]:focus { border-color: #55ffff; }
+
+        .btn {
+            background: #0d0d1a;
+            color: #55ffff;
+            border: 1px solid #55ffff;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.85rem;
+            transition: background 0.15s, color 0.15s;
+            white-space: nowrap;
+        }
+        .btn:hover   { background: #55ffff; color: #0d0d1a; }
+        .btn.danger  { color: #ff5555; border-color: #ff5555; }
+        .btn.danger:hover { background: #ff5555; color: #0d0d1a; }
+
+        .examples {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .chip {
+            background: #0d0d1a;
+            color: #ffff55;
+            border: 1px solid #555;
+            padding: 4px 10px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            font-family: inherit;
+            transition: border-color 0.15s, color 0.15s;
+        }
+        .chip:hover { border-color: #ffff55; color: #fff; }
+
+        .pos-display {
+            font-size: 0.75rem;
+            color: #666;
+        }
+        .pos-display span { color: #55ff55; }
+    </style>
+</head>
+<body>
+
+<h1>DRAW Command &mdash; JavaScript Port</h1>
+<p class="subtitle">
+    QBASIC/QB64PE compatible DRAW command for HTML5 Canvas.<br>
+    Created by RetroNick2020 &bull;
+    <a href="https://retronick2020.itch.io/vecdraw-v10-for-qbasicgwbasicqb64pe" target="_blank">VecDraw at itch.io</a>
+</p>
+
+<div class="canvas-wrapper">
+    <canvas id="drawCanvas" width="640" height="480"></canvas>
+</div>
+
+<!-- Interactive console -->
+<div class="console">
+    <label>DRAW COMMAND STRING</label>
+    <div class="input-row">
+        <input type="text" id="cmdInput"
+               placeholder='e.g. BM200,200 C14 S8 R50 D50 L50 U50'
+               spellcheck="false" autocomplete="off" />
+        <button class="btn" id="runBtn">RUN</button>
+        <button class="btn danger" id="clearBtn">CLEAR</button>
+    </div>
+
+    <label>EXAMPLES (click to run)</label>
+    <div class="examples" id="examples"></div>
+
+    <div class="pos-display">
+        Position: X=<span id="posX">320</span> Y=<span id="posY">240</span>
+        &nbsp;&nbsp; Color: <span id="colIdx">15</span>
+        &nbsp;&nbsp; Scale: <span id="scaleVal">1.00</span>
+        &nbsp;&nbsp; Angle: <span id="angleVal">0</span>&deg;
+    </div>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    /* ---- Preset demos drawn on page load ---- */
+    const PRESETS = [
+        /* [label, setPos(x,y)|null, setColor|null, draw string] */
+        { label: 'Yellow Square',    fn: function() {
+            Draw.setPos(0, 0);
+            Draw.draw('BM100,100 C14 S8 R50 D50 L50 U50');
+        }},
+        { label: 'Red Diamond',     fn: function() {
+            Draw.setPos(320, 150);
+            Draw.setColor(12);
+            Draw.draw('E30 F30 G30 H30');
+            Draw.setPos(0, 0);
+            Draw.draw('BM370,180 P12,12');
+        }},
+        { label: 'Cyan Rot. Square', fn: function() {
+            Draw.setPos(0, 0);
+            Draw.draw('BM500,200 C11 TA45 S4 R40 D40 L40 U40');
+        }},
+        { label: 'Green Star',       fn: function() {
+            Draw.setPos(0, 0);
+            Draw.draw('BM200,350 C10 S8 NU20 ND20 NL20 NR20 NE20 NF20 NG20 NH20');
+        }},
+        { label: 'Magenta Spiral',   fn: function() {
+            Draw.setPos(320, 240);
+            Draw.setColor(13);
+            var s = '';
+            for (var i = 2; i < 60; i += 2) {
+                s += 'R' + i + ' D' + i + ' L' + (i+2) + ' U' + (i+2) + ' ';
+            }
+            Draw.draw(s);
+        }},
+        { label: 'White Octagon',    fn: function() {
+            Draw.setPos(0, 0);
+            Draw.draw('BM420,350 C15 S6 R20 E20 U20 H20 L20 G20 D20 F20');
+        }},
+        { label: 'Cyan Snowflake',   fn: function() {
+            Draw.setPos(0, 0);
+            Draw.draw('BM530,370 C11 S5');
+            Draw.draw('NU30 ND30 NL30 NR30 NE30 NF30 NG30 NH30');
+            Draw.draw('NTA22 U30 NTA22 U30 NTA22 U30 NTA22 U30');
+        }},
+        { label: 'All Directions',   fn: function() {
+            Draw.setPos(0, 0);
+            Draw.draw('BM320,420 C7 S4 U20 R20 D20 L20 E15 F15 G15 H15');
+        }},
+    ];
+
+    /* ---- Example chips (quick run buttons) ---- */
+    const CHIPS = [
+        { text: 'Box',       cmd: 'BM50,50 C12 S6 R60 D40 L60 U40' },
+        { text: 'Diamond',   cmd: 'BM320,50 C13 S5 E30 F30 G30 H30' },
+        { text: 'Cross',     cmd: 'BM500,50 C10 S6 NU30 ND30 NL30 NR30' },
+        { text: 'Step',      cmd: 'BM50,420 C14 S4 R30 U20 R30 U20 R30 U20' },
+        { text: 'Zigzag',    cmd: 'BM300,420 C9 S4 E20 F20 E20 F20 E20 F20' },
+        { text: 'Spiral',    cmd: 'BM520,420 C11 S3 R5 D5 L10 U10 R15 D15 L20 U20 R25 D25 L30 U30' },
+        { text: 'Fill Box',  cmd: 'BM50,230 C3 S6 R60 D40 L60 U40 BM80,255 P3,3' },
+        { text: 'TA Rotate', cmd: 'BM300,230 C14 TA30 S6 R50 D50 L50 U50' },
+    ];
+
+    /* ---- Init canvas ---- */
+    const canvas = document.getElementById('drawCanvas');
+    Draw.init(canvas);
+
+    /* Draw all presets at load */
+    Draw.beginBatch();
+    PRESETS.forEach(function(p) { p.fn(); });
+    Draw.endBatch();
+
+    updateStatus();
+
+    /* ---- Build chip buttons ---- */
+    const examplesEl = document.getElementById('examples');
+    CHIPS.forEach(function(chip) {
+        const btn = document.createElement('button');
+        btn.className   = 'chip';
+        btn.textContent = chip.text;
+        btn.title       = chip.cmd;
+        btn.addEventListener('click', function() {
+            document.getElementById('cmdInput').value = chip.cmd;
+            runCmd(chip.cmd);
+        });
+        examplesEl.appendChild(btn);
+    });
+
+    /* ---- Run / Clear buttons ---- */
+    document.getElementById('runBtn').addEventListener('click', function() {
+        runCmd(document.getElementById('cmdInput').value.trim());
+    });
+
+    document.getElementById('cmdInput').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') runCmd(this.value.trim());
+    });
+
+    document.getElementById('clearBtn').addEventListener('click', function() {
+        Draw.clear(0);
+        Draw.setPos(320, 240);
+        Draw.setColor(15);
+        Draw.setScale(1.0);
+        Draw.setAngle(0);
+        updateStatus();
+    });
+
+    function runCmd(cmd) {
+        if (!cmd) return;
+        Draw.draw(cmd);
+        updateStatus();
+    }
+
+    function updateStatus() {
+        document.getElementById('posX').textContent    = Math.round(Draw.getX());
+        document.getElementById('posY').textContent    = Math.round(Draw.getY());
+        document.getElementById('colIdx').textContent  = Draw.getColor();
+        document.getElementById('scaleVal').textContent = Draw.getScale().toFixed(2);
+        document.getElementById('angleVal').textContent = Draw.getAngle();
+    }
+
+}());
+</script>
+
+</body>
+</html>
